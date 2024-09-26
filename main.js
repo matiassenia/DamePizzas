@@ -32,7 +32,7 @@ function preload() {
     // Cargar imágenes
     this.load.image('pizza', 'img/pizza-img.png');
     this.load.image('background', 'img/aserrinfondorojo.png');
-    this.load.image('catcher', 'img/me-img.png');
+    this.load.image('catcher', 'img/me_catcher.png');
     this.load.image('garbage', 'img/basura.png'); // Cargar imagen de basura
 
     // Cargar música y efectos de sonido
@@ -47,17 +47,25 @@ function create() {
     this.add.image(0, 0, 'background').setOrigin(0, 0).setDisplaySize(800, 600);
 
     // Cesta
-    this.catcher = this.physics.add.image(400, 550, 'catcher').setDisplaySize(120, 80).setCollideWorldBounds(true);
+    this.catcher = this.physics.add.image(400, 550, 'catcher')
+        .setDisplaySize(250, 190)
+        .setCollideWorldBounds(true);  // Asegura que la cesta no salga de los límites del juego
 
-    // Grupo de pizzas y basura
+    this.catcher.setSize(230, 160);  // Ajustamos el área de colisión
+    this.catcher.setOffset(320, 850);  // Centrar el área de colisión
+    this.catcher.setOrigin(0.5, 0.5);  // Centrar el sprite visualmente
+
+    // Grupo de pizzas y basura con reciclaje automático
     this.pizzas = this.physics.add.group({
         defaultKey: 'pizza',
-        maxSize: 10
+        maxSize: 10,
+        runChildUpdate: true
     });
 
     this.garbage = this.physics.add.group({
         defaultKey: 'garbage',
-        maxSize: 10
+        maxSize: 10,
+        runChildUpdate: true
     });
 
     // Crear la primera pizza y basura
@@ -104,9 +112,9 @@ function create() {
 function update() {
     // Mover la cesta con las teclas de flecha
     if (this.cursors.left.isDown) {
-        this.catcher.setVelocityX(-300);
+        this.catcher.setVelocityX(-500);
     } else if (this.cursors.right.isDown) {
-        this.catcher.setVelocityX(300);
+        this.catcher.setVelocityX(500);
     } else {
         this.catcher.setVelocityX(0);
     }
@@ -119,22 +127,47 @@ function update() {
 
 function dropPizza() {
     let pizzaX = Phaser.Math.Between(50, 750);
-    let pizza = this.pizzas.create(pizzaX, 10, 'pizza').setDisplaySize(70, 50);
-    pizza.setVelocityY(200 + score / 10);
-    pizza.checkWorldBounds = true;
-    pizza.outOfBoundsKill = true;
+    let pizza = this.pizzas.get(pizzaX, 10, 'pizza');
+    
+    if (!pizza) return; // No crear si no hay espacio en el grupo
+
+    pizza.setDisplaySize(150, 90);
+    pizza.setVelocityY(120 + score / 15);
+    pizza.setActive(true);
+    pizza.setVisible(true);
+
+    pizza.update = function () {
+        if (this.y > 600) {
+            this.setActive(false);
+            this.setVisible(false);
+            loseLife(); // Perder vida si la pizza no es atrapada
+        }
+    };
 }
 
 function dropGarbage() {
     let garbageX = Phaser.Math.Between(50, 750);
-    let garbage = this.garbage.create(garbageX, 10, 'garbage').setDisplaySize(70, 50);
-    garbage.setVelocityY(200 + score / 10);
-    garbage.checkWorldBounds = true;
-    garbage.outOfBoundsKill = true;
+    let garbage = this.garbage.get(garbageX, 10, 'garbage');
+
+    if (!garbage) return; // No crear si no hay espacio en el grupo
+
+    garbage.setDisplaySize(120, 80);  
+    garbage.setSize(110, 70);
+    garbage.setOffset(5, 5);  // Ajustar el área de colisión para que sea más preciso
+    garbage.setVelocityY(120 + score / 15);
+    garbage.setActive(true);
+    garbage.setVisible(true);
+
+    garbage.update = function () {
+        if (this.y > 600) {
+            this.setActive(false);
+            this.setVisible(false);
+        }
+    };
 }
 
 function catchPizza(catcher, pizza) {
-    pizza.destroy(); // Elimina la pizza atrapada
+    pizza.setActive(false).setVisible(false); // Reutiliza la pizza
     score += 10;
     scoreText.setText('Score: ' + score);
 
@@ -143,8 +176,8 @@ function catchPizza(catcher, pizza) {
 }
 
 function hitGarbage(catcher, garbage) {
-    garbage.destroy(); // Elimina la basura atrapada
-    loseLife();
+    garbage.setActive(false).setVisible(false); // Hacemos que la basura sea invisible y reusable
+    loseLife(); // Reduce una vida
 
     // Reproducir sonido de peligro
     dangerousSound.play();
